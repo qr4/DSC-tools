@@ -1,0 +1,18 @@
+{
+      "serial": "1405270436",
+      "alignToDepth": true,
+      "colorStream": {
+        "resolutionX": "640",
+        "resolutionY": "480",
+        "pixelFormat": "PIXEL_FORMAT_RGB888",
+        "mirror": true
+      },
+      "depthStream": {
+        "resolutionX": "640",
+        "resolutionY": "480",
+        "pixelFormat": "PIXEL_FORMAT_DEPTH_1_MM",
+        "mirror": true,
+        "computeGrayScaleImage": true,
+        "computePoint3fImage": true
+      }
+}
