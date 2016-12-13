@@ -1,6 +1,7 @@
 #include <generic_openni_device.hpp>
 #include <unordered_map>
 #include <iostream>
+#include <boost/filesystem.hpp>
 
 #include <OpenNI.h>
 
@@ -18,9 +19,7 @@ void GenericOpenNIDevice::init(const boost::property_tree::ptree &ptree) {
 
   serial_ = ptree.get<std::string>("serial");
   std::cout << "serial is: " << serial_ << std::endl;
-  uri_ = device_information_map_.at(serial_).getUri();
-  std::cout << "uri is: " << uri_ << std::endl;
-  // TODO set pixel format
+  std::cout << "uri is: " << device_information_map_.at(serial_).getUri() << std::endl;
 
   streams_configs_.clear();
 
@@ -56,21 +55,24 @@ void GenericOpenNIDevice::init(const boost::property_tree::ptree &ptree) {
 }
 
 bool GenericOpenNIDevice::open() {
+  return openWithUri(device_information_map_.at(serial_).getUri());
+}
+
+bool GenericOpenNIDevice::openWithUri(const std::string& uri) {
   if (!initializeOpenNI()) return false;
 
   std::cout << "Opening GenericOpenNIDevice... " << std::endl;
 
-  auto status = device_.open(uri_.c_str());
+  auto status = device_.open(uri.c_str());
 
   if (status != openni::STATUS_OK) {
     std::cerr << openni::OpenNI::getExtendedError() << std::endl;
-    return false;
     openni::OpenNI::shutdown();
     close();
+    return false;
   }
 
   std::cout << "Opened GenericOpenNIDevice successfully!" << std::endl;
-  device_.setDepthColorSyncEnabled(true);
 
   // create & start the streams
   for (auto& type : streams_configs_) {
@@ -111,8 +113,40 @@ bool GenericOpenNIDevice::open() {
 }
 
 bool GenericOpenNIDevice::close() {
-  // TODO terminate capturing thread, and join
+  std::cout << "Shutting down..." << std::flush;
+  if (capturing_thread_.joinable()) {
+    shutdown_ = true;
+    capturing_thread_.join();
+  }
+
+  recorder_.stop();
+  std::cout << " done!" << std::endl;
   return true;
+}
+
+bool GenericOpenNIDevice::startRecording(const std::string &path) {
+  std::cout << "Starting recording for device: " + serial_ << std::endl;
+  std::string recording_path = path + '/' + serial_ + ".oni";
+  boost::filesystem::create_directories(recording_path);
+
+  recorder_.create(recording_path.c_str());
+
+  // attach all streams to the recorder
+  for (const auto &stream_pair : streams_) {
+    auto &&stream = stream_pair.second;
+    if (stream) {
+      // store depth data lossless
+      if (stream->getSensorInfo().getSensorType() == openni::SENSOR_DEPTH) {
+        recorder_.attach(*stream, 0);
+      } else {
+        recorder_.attach(*stream, 1);
+      }
+    }
+  }
+
+  recorder_.start();
+
+  return recorder_.isValid();
 }
 
 std::string GenericOpenNIDevice::getSerial() const {
@@ -160,7 +194,7 @@ std::string GenericOpenNIDevice::listAllDevices() {
 
   for (const auto& device_entry : device_information_map_) {
 
-    sstream << "Device: " << std::endl;
+    sstream << "Device:" << std::endl;
     sstream << "\tSerial number: " << device_entry.first << std::endl;
     sstream << "\tUri: " << device_entry.second.getUri() << std::endl;
     sstream << "\tName: " << device_entry.second.getName() << std::endl;
@@ -216,7 +250,6 @@ void GenericOpenNIDevice::fetchDeviceInformation() {
 }
 
 openni::VideoMode GenericOpenNIDevice::getVideoModeFromConfig(const boost::property_tree::ptree &ptree) {
-  // TODO parse more config options here and dont use the defaults?
   openni::VideoMode mode;
   mode.setFps(30);
   mode.setResolution(ptree.get<int>("resolutionX"), ptree.get<int>("resolutionY"));
@@ -283,12 +316,9 @@ void GenericOpenNIDevice::capturingThread() {
   while (!device_.isFile()) {
     try {
       getNextImages();
+      if (shutdown_) break;
     } catch (std::runtime_error &err) {
       std::cerr << "Error! " << err.what() << std::endl;
-      while (true) {
-        newImagesAvailable_ = true;
-        new_images_condition_.notify_one();
-      }
     }
   }
 }
@@ -463,15 +493,15 @@ cv::Mat GenericOpenNIDevice::convertMillimeterMatToPoint3fMat(const cv::Mat &dep
   const float xz_factor = tan(fov.first/2.) * 2.;
   const float yz_factor = tan(fov.second/2.) * 2.;
 
-  for (int y = 0; y < res_image.cols; ++y) {
+  for (int y = 0; y < res_image.rows; ++y) {
       const uint16_t *depth_row = depth_image.ptr<uint16_t>(y);
 
       cv::Point3f *target_row = res_image.ptr<cv::Point3f>(y);
 
-      const float normalized_y = 0.5f - static_cast<float>(y) / static_cast<float>(res_image.cols);
+      const float normalized_y = 0.5f - static_cast<float>(y) / static_cast<float>(res_image.rows);
 
-      for (int x = 0; x < res_image.rows; ++x) {
-        const float normalized_x = static_cast<float>(x) / static_cast<float>(res_image.rows) - 0.5f;
+      for (int x = 0; x < res_image.cols; ++x) {
+        const float normalized_x = static_cast<float>(x) / static_cast<float>(res_image.cols) - 0.5f;
 
         const float depth_scaled = depth_row[x] * millimeter_to_meter_factor;
         target_row[x].x = normalized_x * depth_scaled * xz_factor;

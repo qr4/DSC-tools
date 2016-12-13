@@ -14,7 +14,7 @@ endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 cmake_minimum_required(VERSION 2.8)
 
 # Project name and version number
-project("openni2-tools")
+project("dsc-tools")
 string(TOLOWER ${PROJECT_NAME} PROJECT_NAME_LOWER)
 set(${PROJECT_NAME}_VERSION_MAJOR "1")
 set(${PROJECT_NAME}_VERSION_MINOR "0")
@@ -51,7 +51,6 @@ if(NOT "${LIBRARY_ROOT_PATH}" STREQUAL "")
     set(CMAKE_INSTALL_PREFIX_TMP ${LIBRARY_ROOT_PATH}/${CMAKE_PROJECT_NAME})
     string(TOLOWER ${CMAKE_INSTALL_PREFIX_TMP} CMAKE_INSTALL_PREFIX_TMP)
     set(CMAKE_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX_TMP} CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
-    #set(CMAKE_INSTALL_PREFIX ${LIBRARY_ROOT_PATH} CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
   endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
@@ -100,35 +99,24 @@ endif()
 # Libraries
 ###############################################################################
 
-# PCL
-option (WITH_PCL "Build modules depending on pcl" off)
-if(WITH_PCL)
   # PCL library
-  # ATTENTION: FindPCL.cmake also messes with Boost CMake variables! Put it before finding boost!
-  # ATTENTION: FindPCL.cmake also defines OPENNI-variables!
-  find_package(PCL 1.7 REQUIRED)
-  if(PCL_FOUND)
-    list(APPEND EXTERNAL_PROJECT_INCLUDES ${PCL_INCLUDE_DIRS})
-    link_directories(${PCL_LIBRARY_DIRS})
-    add_definitions(${PCL_DEFINITIONS})
-  endif(PCL_FOUND)
-endif(WITH_PCL)
+find_package(PCL 1.7 REQUIRED)
+if(PCL_FOUND)
+  list(APPEND EXTERNAL_PROJECT_INCLUDES ${PCL_INCLUDE_DIRS})
+  link_directories(${PCL_LIBRARY_DIRS})
+  add_definitions(${PCL_DEFINITIONS})
+endif(PCL_FOUND)
 
 # Boost
-# based on find script
-option (WITH_BOOST "Build modules depending on boost" on)
-if(WITH_BOOST)
-  set(Boost_USE_MULTITHREADED ON)
-  find_package(Boost COMPONENTS filesystem system thread program_options REQUIRED)
+set(Boost_USE_MULTITHREADED ON)
+find_package(Boost COMPONENTS filesystem system thread program_options REQUIRED)
 
-  if(Boost_FOUND)
-      list(APPEND SYSTEM_INCLUDES ${Boost_INCLUDE_DIRS})
-      link_directories(${Boost_LIBRARY_DIRS})
-  endif(Boost_FOUND)
-endif(WITH_BOOST)
+if(Boost_FOUND)
+  list(APPEND SYSTEM_INCLUDES ${Boost_INCLUDE_DIRS})
+  link_directories(${Boost_LIBRARY_DIRS})
+endif(Boost_FOUND)
 
 # OpenCV
-# looks for OpenCVConfig.cmake
 set(OpenCV_DIR /usr/ CACHE FILEPATH "OpenCV root directory")
 find_package(OpenCV PATHS ${OpenCV_DIR} ${OpenCV_DIR}/share/OpenCV ${OpenCV_DIR}/share/opencv REQUIRED NO_MODULE)
 if(OpenCV_FOUND)
@@ -137,10 +125,7 @@ if(OpenCV_FOUND)
 endif(OpenCV_FOUND)
 
 # OpenNI2
-# based on custom find script
-# ATTENTION: FindPCL.cmake defines OPENNI-variables! Do not get confused!
 find_package(OpenNI2 REQUIRED)
-
 if(OPENNI2_FOUND)
   # Include and link directories
   list(APPEND EXTERNAL_PROJECT_INCLUDES ${OpenNI2_INCLUDE_DIRS})
@@ -155,7 +140,6 @@ list(APPEND PROJECT_INCLUDES ${CMAKE_SOURCE_DIR}/include)
 
 include_directories(${PROJECT_INCLUDES})
 include_directories(${EXTERNAL_PROJECT_INCLUDES})
-add_definitions(${PROJECT_DEFINITIONS})
 
 
 ###############################################################################
@@ -165,7 +149,6 @@ add_definitions(${PROJECT_DEFINITIONS})
 # The special flags (e.g. debug and release) are added to the general flags
 if (CMAKE_COMPILER_IS_GNUCXX)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wextra -Wno-unused-parameter -pthread -fPIC")
-  #set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--copy-dt-needed-entries")
 endif (CMAKE_COMPILER_IS_GNUCXX)
 
 
@@ -176,7 +159,6 @@ endif (CMAKE_COMPILER_IS_GNUCXX)
 string(TOUPPER ${CMAKE_BUILD_TYPE} TMP_BUILD_TYPE)
 message(STATUS "CXXFLAGS: ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${TMP_BUILD_TYPE}}")
 message(STATUS "Install directory: " ${CMAKE_INSTALL_PREFIX})
-get_directory_property(DEFINITIONS DEFINITIONS)
 
 
 ###############################################################################
@@ -186,13 +168,11 @@ get_directory_property(DEFINITIONS DEFINITIONS)
 add_subdirectory(src)
 add_subdirectory(app)
 
-
 ###############################################################################
 # Install targets
 ###############################################################################
 install(DIRECTORY include/ DESTINATION ${INCLUDE_INSTALL_PATH})
 install(DIRECTORY data/ DESTINATION ${DATA_INSTALL_PATH})
-
 
 ###############################################################################
 # Generate CMake project files

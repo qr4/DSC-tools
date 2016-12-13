@@ -38,9 +38,15 @@ class GenericOpenNIDevice
 
     void init(const boost::property_tree::ptree &ptree);
 
-    // open the device with an uri
+    // open the device with the serial set in the property_tree
     bool open();
+    // open the device a the uri. Can also be a recording.
+    bool openWithUri(const std::string& uri);
+
     bool close();
+
+    bool startRecording(const std::string &path);
+    bool stopRecording();
 
     std::string getSerial() const;
 
@@ -75,11 +81,13 @@ class GenericOpenNIDevice
     std::unordered_map<openni::SensorType, SensorConfig> streams_configs_;
 
     std::string serial_;
-    std::string uri_;
     openni::Device device_;
+    openni::Recorder recorder_;
+
     std::unordered_map<openni::SensorType, std::unique_ptr<openni::VideoStream>> streams_;
 
     std::thread capturing_thread_;
+    bool shutdown_;
     std::condition_variable thread_set_up_condition_;
 
     std::condition_variable new_images_condition_;

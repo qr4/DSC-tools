@@ -84,4 +84,6 @@ int main(int argc, char* argv[]) {
     if (key == 27 /* Esc */) break;
 
   }
+
+  device->close();
 }
