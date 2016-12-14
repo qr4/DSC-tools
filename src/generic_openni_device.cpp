@@ -92,8 +92,8 @@ bool GenericOpenNIDevice::openWithUri(const std::string& uri) {
   device_.setDepthColorSyncEnabled(true);
 
   // check if all streams are valid
-  for (const auto& stream : streams_) {
-    if (!stream.second || !stream.second->isValid())
+  for (const auto& stream_pair : streams_) {
+    if (!stream_pair.second || !stream_pair.second->isValid())
     {
       std::cerr << "some streams were invalid" << std::endl;
       return false;
@@ -108,6 +108,24 @@ bool GenericOpenNIDevice::openWithUri(const std::string& uri) {
   std::unique_lock<std::mutex> lk(capturing_mutex_);
   thread_set_up_condition_.wait(lk); // until capturing thread is set up
 
+  if (device_.isFile()) {
+    boost::filesystem::path file(uri);
+    std::cout << "This GenericOpenNIDevice is a recording: " << file.string() << std::endl;
+
+    serial_ = file.filename().stem().string();
+    std::cout << "Available frames:" << std::endl;
+
+    for (const auto& stream_pair : streams_) {
+      std::cout << "\t" << openNISensorTypeToString(stream_pair.first) << ": ";
+      std::cout << device_.getPlaybackControl()->getNumberOfFrames(*stream_pair.second) << std::endl;
+    }
+
+    device_.getPlaybackControl()->setRepeatEnabled(false);
+
+    // every call to next frames will advance the frame counter by 1
+    device_.getPlaybackControl()->setSpeed(-1);
+  }
+
   std::cout << "Done!" << std::endl;
   return true;
 }
@@ -119,15 +137,17 @@ bool GenericOpenNIDevice::close() {
     capturing_thread_.join();
   }
 
-  recorder_.stop();
+  stopRecording();
+
   std::cout << " done!" << std::endl;
+
   return true;
 }
 
 bool GenericOpenNIDevice::startRecording(const std::string &path) {
   std::cout << "Starting recording for device: " + serial_ << std::endl;
   std::string recording_path = path + '/' + serial_ + ".oni";
-  boost::filesystem::create_directories(recording_path);
+  boost::filesystem::create_directories(path);
 
   recorder_.create(recording_path.c_str());
 
@@ -147,6 +167,10 @@ bool GenericOpenNIDevice::startRecording(const std::string &path) {
   recorder_.start();
 
   return recorder_.isValid();
+}
+
+void GenericOpenNIDevice::stopRecording() {
+  recorder_.stop();
 }
 
 std::string GenericOpenNIDevice::getSerial() const {
@@ -174,8 +198,12 @@ std::pair<float, float> GenericOpenNIDevice::getDepthFov() const {
 
 std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> GenericOpenNIDevice::getImages() {
   if (!newImagesAvailable_) {
-    std::unique_lock<std::mutex> lk(capturing_mutex_);
-    new_images_condition_.wait(lk);
+    if (device_.isFile()) {
+      getNextImages();
+    } else {
+      std::unique_lock<std::mutex> lk(capturing_mutex_);
+      new_images_condition_.wait(lk);
+    }
   }
 
   newImagesAvailable_ = false;
@@ -294,7 +322,7 @@ bool GenericOpenNIDevice::createStream(const openni::SensorType &type) {
 
   auto sensor_config = streams_configs_[type];
 
-  if (stream->setVideoMode(sensor_config.video_mode) != openni::STATUS_OK) {
+  if (!device_.isFile() && stream->setVideoMode(sensor_config.video_mode) != openni::STATUS_OK) {
     std::cerr << "Error! setVideoMode failed: " << openni::OpenNI::getExtendedError() << std::endl;
     stream->destroy();
     return false;
@@ -323,8 +351,7 @@ void GenericOpenNIDevice::capturingThread() {
   }
 }
 
-void GenericOpenNIDevice::getNextImages()
-{
+void GenericOpenNIDevice::getNextImages() {
   std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> temp_images;
 
   for (const auto& stream_pair : streams_) {
@@ -449,7 +476,6 @@ cv::Mat GenericOpenNIDevice::convertIRMatToRGB(const cv::Mat &image) {
   return res_image;
 }
 
-
 cv::Mat GenericOpenNIDevice::alignColorMatToDepthMat(const cv::Mat &color_image, const cv::Mat &depth_image) {
   cv::Mat_<cv::Vec3b> res_image(cv::Size(color_image.cols, color_image.rows));
   // sanity check: if either the color stream or the depth stream were not opened, return black image
@@ -512,3 +538,29 @@ cv::Mat GenericOpenNIDevice::convertMillimeterMatToPoint3fMat(const cv::Mat &dep
 
   return res_image;
 }
+
+cv::Point2f GenericOpenNIDevice::project(const cv::Point3f &pt) {
+
+  const float width = streams_configs_[openni::SENSOR_DEPTH].video_mode.getResolutionX();
+  const float height = streams_configs_[openni::SENSOR_DEPTH].video_mode.getResolutionY();
+
+  const auto fov = getDepthFov();
+
+  float fx = 1./(tan(fov.first / 2.) * 2.) / width;
+  float fy = 1./(tan(fov.second/ 2.) * 2.) / height;
+
+  float cx = width / 2.;
+  float cy = height / 2.;
+
+  cv::Point3f pt_in_cam_coords(pt.x, -pt.y, -pt.z);
+
+  float u = pt_in_cam_coords.x * fx  + pt_in_cam_coords.z * cx;
+  float v = pt_in_cam_coords.y * fy  + pt_in_cam_coords.z * cy;
+  float w = pt_in_cam_coords.z;
+
+  u /= v;
+  v /= w;
+
+  return cv::Point2f(u,v);
+}
+

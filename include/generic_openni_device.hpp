@@ -7,6 +7,7 @@
 #include <thread>
 #include <tuple>
 #include <condition_variable>
+#include <atomic>
 
 // Boost
 #include <boost/property_tree/ptree.hpp>
@@ -46,7 +47,7 @@ class GenericOpenNIDevice
     bool close();
 
     bool startRecording(const std::string &path);
-    bool stopRecording();
+    void stopRecording();
 
     std::string getSerial() const;
 
@@ -56,6 +57,8 @@ class GenericOpenNIDevice
     std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> getImages();
 
     static std::string listAllDevices();
+
+    cv::Point2f project(const cv::Point3f &pt);
 
   private:
     static bool initializeOpenNI();
@@ -77,6 +80,7 @@ class GenericOpenNIDevice
     cv::Mat alignColorMatToDepthMat(const cv::Mat &color_image, const cv::Mat &depth_image);
     cv::Mat convertMillimeterMatToPoint3fMat(const cv::Mat &depth_mat);
 
+
   private:
     std::unordered_map<openni::SensorType, SensorConfig> streams_configs_;
 
@@ -87,7 +91,7 @@ class GenericOpenNIDevice
     std::unordered_map<openni::SensorType, std::unique_ptr<openni::VideoStream>> streams_;
 
     std::thread capturing_thread_;
-    bool shutdown_;
+    std::atomic<bool> shutdown_;
     std::condition_variable thread_set_up_condition_;
 
     std::condition_variable new_images_condition_;

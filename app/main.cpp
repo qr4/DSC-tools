@@ -13,7 +13,14 @@
 #include "generic_openni_device.hpp"
 
 struct Configuration {
+  // parsed from command line
   std::string config_file;
+  std::string record_path;
+  std::string input_path;
+
+  // computed
+  bool record;
+  bool with_recording;
 };
 
 bool processCommandLine(int argc, char** argv, Configuration &config) {
@@ -23,6 +30,8 @@ bool processCommandLine(int argc, char** argv, Configuration &config) {
     ("help,h", "Print this help message")
     ("list,l", "List all connected devices")
     ("config,c", boost::program_options::value<std::string>(&config.config_file))
+    ("record,r", boost::program_options::value<std::string>(&config.record_path))
+    ("input,i", boost::program_options::value<std::string>(&config.input_path))
     ;
   try
   {
@@ -41,6 +50,13 @@ bool processCommandLine(int argc, char** argv, Configuration &config) {
 
     if (!vm.count("config")) {
       std::cout << "You must provide a config file." << std::endl << desc << std::endl;
+      return false;
+    }
+    config.record = vm.count("record");
+    config.with_recording = vm.count("input");
+
+    if (config.record && config.with_recording) {
+      std::cout << "Input and record are mutually exclusive."<< std::endl << desc << std::endl;
       return false;
     }
 
@@ -67,7 +83,16 @@ int main(int argc, char* argv[]) {
   auto device = new GenericOpenNIDevice();
 
   device->init(ptree);
-  if (!device->open()) return 1;
+
+  if (config.with_recording) {
+    if (!device->openWithUri(config.input_path)) return 1;
+  } else {
+    if (!device->open()) return 1;
+  }
+
+  if (config.record) {
+    device->startRecording(config.record_path);
+  }
 
   cv::namedWindow("color", cv::WINDOW_AUTOSIZE);
   cv::namedWindow("depth-gray", cv::WINDOW_AUTOSIZE);
@@ -82,7 +107,6 @@ int main(int argc, char* argv[]) {
     cv::imshow("depth-gray", depthGrayImage);
     auto key = cv::waitKey(1);
     if (key == 27 /* Esc */) break;
-
   }
 
   device->close();
