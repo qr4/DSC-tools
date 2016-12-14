@@ -197,7 +197,7 @@ std::pair<float, float> GenericOpenNIDevice::getDepthFov() const {
 }
 
 std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> GenericOpenNIDevice::getImages() {
-  if (!newImagesAvailable_) {
+  if (!new_images_available_) {
     if (device_.isFile()) {
       getNextImages();
     } else {
@@ -206,7 +206,7 @@ std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> GenericOpenNIDevice
     }
   }
 
-  newImagesAvailable_ = false;
+  new_images_available_ = false;
   return images_;
 }
 
@@ -245,36 +245,35 @@ void GenericOpenNIDevice::fetchDeviceInformation() {
   if (!initializeOpenNI()) return;
 
   // get device information
-  openni::Array<openni::DeviceInfo> deviceInfos;
-  openni::OpenNI::enumerateDevices(&deviceInfos);
+  openni::Array<openni::DeviceInfo> device_infos;
+  openni::OpenNI::enumerateDevices(&device_infos);
 
   GenericOpenNIDevice::device_information_map_.clear();
 
-  for (int i = 0; i < deviceInfos.getSize(); ++i) {
+  for (int i = 0; i < device_infos.getSize(); ++i) {
     // Open the device to determine the serial...
     auto device = std::make_shared<openni::Device>();
-    std::string uri = deviceInfos[i].getUri();
-    auto returnCode = device->open(uri.c_str());
+    std::string uri = device_infos[i].getUri();
+    auto return_code = device->open(uri.c_str());
 
-    if (returnCode != openni::STATUS_OK) {
+    if (return_code != openni::STATUS_OK) {
       std::cerr << "Error! Could not open device by uri: " <<  uri << std::endl;
       return;
     }
 
     // read the serial
-    char serialNumber[1024];
-    returnCode = device->getProperty(ONI_DEVICE_PROPERTY_SERIAL_NUMBER, &serialNumber);
+    char serial_number[1024];
+    return_code = device->getProperty(ONI_DEVICE_PROPERTY_SERIAL_NUMBER, &serial_number);
 
-    if (returnCode != openni::STATUS_OK) {
+    if (return_code != openni::STATUS_OK) {
       std::cerr << "Error! Could not get serial number for device uri: " << uri << std::endl;
       return;
     }
 
-    GenericOpenNIDevice::device_information_map_[std::string(serialNumber)] = deviceInfos[i];
+    GenericOpenNIDevice::device_information_map_[std::string(serial_number)] = device_infos[i];
 
     device->close();
   }
-
 }
 
 openni::VideoMode GenericOpenNIDevice::getVideoModeFromConfig(const boost::property_tree::ptree &ptree) {
@@ -291,19 +290,19 @@ bool GenericOpenNIDevice::createStream(const openni::SensorType &type) {
   std::cout << "Creating stream for sensortype: " << openNISensorTypeToString(type) << std::endl;
 
   auto stream = std::make_unique<openni::VideoStream>();
-  auto returnCode = stream->create(device_, type);
-  if (returnCode != openni::STATUS_OK) {
+  auto return_code = stream->create(device_, type);
+  if (return_code != openni::STATUS_OK) {
     std::cerr << "Error! stream create failed: " << openni::OpenNI::getExtendedError() << std::endl;
     stream->destroy();
     return false;
   }
 
-  const auto *sensorInfo = device_.getSensorInfo(type);
-  if (sensorInfo == nullptr) {
+  const auto *sensor_info = device_.getSensorInfo(type);
+  if (sensor_info == nullptr) {
     throw std::runtime_error("Tried to get the sensorInfo, but the sensor info was not found!");
   }
 
-  const auto &supported_video_modes = sensorInfo->getSupportedVideoModes();
+  const auto &supported_video_modes = sensor_info->getSupportedVideoModes();
 
   std::cout << "The supported video modes are: " << std::endl;
 
@@ -341,10 +340,9 @@ bool GenericOpenNIDevice::createStream(const openni::SensorType &type) {
 void GenericOpenNIDevice::capturingThread() {
   getNextImages();
   thread_set_up_condition_.notify_one();
-  while (!device_.isFile()) {
+  while (!device_.isFile() && !shutdown_)  {
     try {
       getNextImages();
-      if (shutdown_) break;
     } catch (std::runtime_error &err) {
       std::cerr << "Error! " << err.what() << std::endl;
     }
@@ -456,7 +454,7 @@ cv::Mat GenericOpenNIDevice::transformIRFrameToMat(const openni::VideoFrameRef &
   const uint16_t* data = reinterpret_cast<const uint16_t*>(frame.getData());
   cv::Mat image(cv::Size(frame.getWidth(), frame.getHeight()), CV_8UC1);
 
-  // TODO: which conversion factor to use?
+  // TODO: Use a dynamic conversion factor based on device
   const float conversion_fac = 1. /10.;
 
   for (int y = 0; y < image.rows; ++y) {
@@ -478,6 +476,7 @@ cv::Mat GenericOpenNIDevice::convertIRMatToRGB(const cv::Mat &image) {
 
 cv::Mat GenericOpenNIDevice::alignColorMatToDepthMat(const cv::Mat &color_image, const cv::Mat &depth_image) {
   cv::Mat_<cv::Vec3b> res_image(cv::Size(color_image.cols, color_image.rows));
+
   // sanity check: if either the color stream or the depth stream were not opened, return black image
   if (!streams_.count(openni::SENSOR_COLOR) || !streams_.count(openni::SENSOR_DEPTH)) return res_image;
 

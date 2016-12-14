@@ -97,7 +97,7 @@ class GenericOpenNIDevice
     std::condition_variable new_images_condition_;
     std::mutex capturing_mutex_;
 
-    bool newImagesAvailable_;
+    bool new_images_available_;
     std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> images_;
 
     static std::unordered_map<std::string, openni::DeviceInfo> device_information_map_;
