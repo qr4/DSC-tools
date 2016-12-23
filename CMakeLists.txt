@@ -31,30 +31,10 @@ set(EXECUTABLE_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/bin)
 set(SHARE_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME_LOWER})
 set(DATA_INSTALL_PATH ${SHARE_INSTALL_PATH}/data)
 
-###############################################################################
-# Install path
-###############################################################################
-# Set the root path where the libraries are installed.
-# This can be either done with the environment variable LIBRARY_ROOT_PATH or
-# by using the -D option (-DLIBRARY_ROOT_PATH=/path/to/libraries).
-# The -D option has a higher priority than environment variables.
-if("${LIBRARY_ROOT_PATH}" STREQUAL "")
-  if(NOT "$ENV{LIBRARY_ROOT_PATH}" STREQUAL "")
-    set(LIBRARY_ROOT_PATH $ENV{LIBRARY_ROOT_PATH})
-  endif()
-endif()
-
-# Also set the install prefix to the library root path if it is set.
-# In this case, also append the project name to install prefix.
-if(NOT "${LIBRARY_ROOT_PATH}" STREQUAL "")
-  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX_TMP ${LIBRARY_ROOT_PATH}/${CMAKE_PROJECT_NAME})
-    string(TOLOWER ${CMAKE_INSTALL_PREFIX_TMP} CMAKE_INSTALL_PREFIX_TMP)
-    set(CMAKE_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX_TMP} CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
-  endif(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-endif()
-
-
+# force c++14
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 ###############################################################################
 # Specify the rpath handling
@@ -100,7 +80,7 @@ endif()
 ###############################################################################
 
   # PCL library
-find_package(PCL 1.7 REQUIRED)
+find_package(PCL 1.8 REQUIRED)
 if(PCL_FOUND)
   list(APPEND EXTERNAL_PROJECT_INCLUDES ${PCL_INCLUDE_DIRS})
   link_directories(${PCL_LIBRARY_DIRS})
@@ -148,7 +128,8 @@ include_directories(${EXTERNAL_PROJECT_INCLUDES})
 
 # The special flags (e.g. debug and release) are added to the general flags
 if (CMAKE_COMPILER_IS_GNUCXX)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -Wall -Wextra -Wno-unused-parameter -pthread -fPIC")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--copy-dt-needed-entries")
 endif (CMAKE_COMPILER_IS_GNUCXX)
 
 
@@ -157,7 +138,7 @@ endif (CMAKE_COMPILER_IS_GNUCXX)
 ###############################################################################
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} TMP_BUILD_TYPE)
-message(STATUS "CXXFLAGS: ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${TMP_BUILD_TYPE}}")
+message(STATUS "CXX_FLAGS: ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${TMP_BUILD_TYPE}}")
 message(STATUS "Install directory: " ${CMAKE_INSTALL_PREFIX})
 
 

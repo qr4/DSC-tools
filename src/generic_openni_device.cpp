@@ -19,7 +19,9 @@ void GenericOpenNIDevice::init(const boost::property_tree::ptree &ptree) {
 
   serial_ = ptree.get<std::string>("serial");
   std::cout << "serial is: " << serial_ << std::endl;
-  std::cout << "uri is: " << device_information_map_.at(serial_).getUri() << std::endl;
+  if (device_information_map_.count(serial_)) {
+    std::cout << " found connected device for this serial: " << device_information_map_.at(serial_).getUri() << std::endl;
+  }
 
   streams_configs_.clear();
 
@@ -441,7 +443,7 @@ cv::Mat GenericOpenNIDevice::transformDepthFrameToMillimeterMat(const openni::Vi
 
 cv::Mat GenericOpenNIDevice::convertMillimeterMatToRGB(const cv::Mat &image) {
   cv::Mat res_image;
-  float conversion_factor = 255./10000.;
+  float conversion_factor = 255.f/10000.f;
 
   image.convertTo(res_image, CV_8UC1, conversion_factor);
 
@@ -455,7 +457,7 @@ cv::Mat GenericOpenNIDevice::transformIRFrameToMat(const openni::VideoFrameRef &
   cv::Mat image(cv::Size(frame.getWidth(), frame.getHeight()), CV_8UC1);
 
   // TODO: Use a dynamic conversion factor based on device
-  const float conversion_fac = 1. /10.;
+  const float conversion_fac = 1.f /10.f;
 
   for (int y = 0; y < image.rows; ++y) {
     uint8_t *row = image.ptr(y);
@@ -509,14 +511,14 @@ cv::Mat GenericOpenNIDevice::alignColorMatToDepthMat(const cv::Mat &color_image,
 }
 
 cv::Mat GenericOpenNIDevice::convertMillimeterMatToPoint3fMat(const cv::Mat &depth_image) {
-  const float millimeter_to_meter_factor = 1. / 1000.;
+  const float millimeter_to_meter_factor = 1.f / 1000.f;
 
   cv::Mat_<cv::Point3f> res_image(depth_image.size());
 
   const auto fov = getDepthFov();
 
-  const float xz_factor = tan(fov.first/2.) * 2.;
-  const float yz_factor = tan(fov.second/2.) * 2.;
+  const float xz_factor = tan(fov.first/2.f) * 2.f;
+  const float yz_factor = tan(fov.second/2.f) * 2.f;
 
   for (int y = 0; y < res_image.rows; ++y) {
       const uint16_t *depth_row = depth_image.ptr<uint16_t>(y);
@@ -545,11 +547,11 @@ cv::Point2f GenericOpenNIDevice::project(const cv::Point3f &pt) {
 
   const auto fov = getDepthFov();
 
-  float fx = 1./(tan(fov.first / 2.) * 2.) / width;
-  float fy = 1./(tan(fov.second/ 2.) * 2.) / height;
+  float fx = 1.f/(tan(fov.first / 2.f) * 2.f) / width;
+  float fy = 1.f/(tan(fov.second/ 2.f) * 2.f) / height;
 
-  float cx = width / 2.;
-  float cy = height / 2.;
+  float cx = width / 2.f;
+  float cy = height / 2.f;
 
   cv::Point3f pt_in_cam_coords(pt.x, -pt.y, -pt.z);
 

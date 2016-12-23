@@ -1,9 +1,12 @@
 #pragma once
 
-#include <enums.hpp>
+#include <string>
 #include <OpenNI.h>
 
-#include <string>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+
+#include <enums.hpp>
 
 std::string imageTypeToString(const ImageType &type) {
   switch (type) {
@@ -65,4 +68,41 @@ std::string openNIPixelFormatToString(const openni::PixelFormat &format) {
   };
 }
 
+// Image to PointCloud transformations
+pcl::PointCloud<pcl::PointXYZ>::Ptr getPointCloud(const cv::Mat_<cv::Point3f> &p3f_image) {
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+  for (int y = 0; y < p3f_image.rows; ++y) {
+    const cv::Point3f *row = p3f_image.ptr<cv::Point3f>(y);
+
+    for (int x = 0; x < p3f_image.cols; ++x) {
+      pcl::PointXYZ pt(row[x].x, row[x].y, row[x].z);
+      cloud->push_back(pt);
+    }
+  }
+  return cloud;
+}
+
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr getPointCloud(const cv::Mat_<cv::Point3f> &p3f_image,
+                                                  const cv::Mat_<cv::Vec3b> &color_image) {
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+  for (int y = 0; y < p3f_image.rows; ++y) {
+    const cv::Point3f *depth_row = p3f_image.ptr<cv::Point3f>(y);
+    const cv::Vec3b *color_row = p3f_image.ptr<cv::Vec3b>(y);
+
+    for (int x = 0; x < p3f_image.cols; ++x) {
+      pcl::PointXYZRGB pt(depth_row[x].x, depth_row[x].y, depth_row[x].z);
+      pt.r = color_row[x][0];
+      pt.r = color_row[x][1];
+      pt.r = color_row[x][2];
+
+      cloud->push_back(pt);
+    }
+  }
+  return cloud;
+}
+
+pcl::PointCloud<pcl::PointXZYRGB>::Ptr getPointCloud(const cv::Mat_<cv::Point3f> &p3f_image, cv::Scalar &color) {
+  cv::Mat color_image(p3f_image.size(), CV_8UC3, color);
+  return getPointCloud(p3f_image, color_image);
+}
 

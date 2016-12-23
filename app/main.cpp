@@ -1,6 +1,7 @@
 // C++ libs
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <fstream>
 
 // Boost
@@ -11,6 +12,8 @@
 
 // Project includes
 #include "generic_openni_device.hpp"
+#include "utility_functions.hpp"
+#include "visualizer.hpp"
 
 struct Configuration {
   // parsed from command line
@@ -71,6 +74,22 @@ bool processCommandLine(int argc, char** argv, Configuration &config) {
   return true;
 }
 
+
+// FIXME: ugly globals
+std::atomic<bool> paused(false);
+std::atomic<bool> shutdown(false);
+
+void keyboardCallback(const pcl::visualization::KeyboardEvent &ev) {
+  std::cout << "key was pressed: " << ev.getKeySym() << std::endl;
+  if (ev.keyDown()) {
+    if (ev.getKeySym() == "space") {
+      paused = !paused;
+    } else if (ev.getKeySym() == "Escape" || ev.getKeySym() == "q") {
+      shutdown = true;
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
 
   Configuration config;
@@ -79,6 +98,9 @@ int main(int argc, char* argv[]) {
   boost::filesystem::path configuration_file(boost::filesystem::absolute(config.config_file));
   boost::property_tree::ptree ptree;
   boost::property_tree::read_json(configuration_file.string(), ptree);
+
+  Visualizer vis;
+  vis.registerKeyboardCallback(keyboardCallback);
 
   auto device = new GenericOpenNIDevice();
 
@@ -94,19 +116,26 @@ int main(int argc, char* argv[]) {
     device->startRecording(config.record_path);
   }
 
-  cv::namedWindow("color", cv::WINDOW_AUTOSIZE);
-  cv::namedWindow("depth-gray", cv::WINDOW_AUTOSIZE);
+//  cv::namedWindow("color", cv::WINDOW_AUTOSIZE);
+//  cv::namedWindow("depth-gray", cv::WINDOW_AUTOSIZE);
 
-  while (true) {
+  while (!shutdown) {
+    if (paused) continue;
+
     auto images = device->getImages();
-    auto depthMmImage = std::get<1>(images.at(ImageType::DEPTH_MM));
-    auto depthGrayImage = std::get<1>(images.at(ImageType::DEPTH_GRAYSCALE));
-    auto rgbImage = std::get<1>(images.at(ImageType::RGB_ALIGNED));
+//    auto depth_mm_image = std::get<1>(images.at(ImageType::DEPTH_MM));
+//    auto depth_gray_image = std::get<1>(images.at(ImageType::DEPTH_GRAYSCALE));
+//    auto rgb_image = std::get<1>(images.at(ImageType::RGB_ALIGNED));
+    auto p3f_image = std::get<1>(images.at(ImageType::POINT_3F));
+    vis.removePointCloud("cam0");
 
-    cv::imshow("color", rgbImage);
-    cv::imshow("depth-gray", depthGrayImage);
-    auto key = cv::waitKey(1);
-    if (key == 27 /* Esc */) break;
+    auto point_cloud = getPointCloud(p3f_image);
+    vis.addPointCloud<pcl::PointXYZ>(point_cloud, "cam0");
+
+//    cv::imshow("color", rgb_image);
+//    cv::imshow("depth-gray", depth_gray_image);
+//    auto key = cv::waitKey(1);
+//    if (key == 27 /* Esc */) break;
   }
 
   device->close();
