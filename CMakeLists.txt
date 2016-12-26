@@ -147,7 +147,7 @@ message(STATUS "Install directory: " ${CMAKE_INSTALL_PREFIX})
 # This folder contains the library, applications
 ###############################################################################
 add_subdirectory(src)
-add_subdirectory(app)
+add_subdirectory(apps)
 
 ###############################################################################
 # Install targets

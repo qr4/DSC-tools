@@ -18,8 +18,8 @@
 #include <OpenNI.h>
 
 // Project Includes
-#include <utility_functions.hpp>
-#include <enums.hpp>
+#include "utility_functions.hpp"
+#include "enums.hpp"
 
 struct SensorConfig {
   bool mirror;

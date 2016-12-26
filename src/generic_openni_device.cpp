@@ -91,7 +91,7 @@ bool GenericOpenNIDevice::openWithUri(const std::string& uri) {
     }
   }
 
-  device_.setDepthColorSyncEnabled(true);
+//  device_.setDepthColorSyncEnabled(true);
 
   // check if all streams are valid
   for (const auto& stream_pair : streams_) {

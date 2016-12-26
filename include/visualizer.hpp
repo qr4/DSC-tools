@@ -43,6 +43,12 @@ class Visualizer {
         callFuncSync([&](){pcl_visualizer_->addPointCloud(cloud, id, viewport);});
       }
 
+    template<typename PointT>
+      void updatePointCloud(const typename pcl::PointCloud<PointT>::Ptr &cloud,
+                            const std::string &id = "cloud") {
+        callFuncSync([&](){pcl_visualizer_->updatePointCloud(cloud, id);});
+      }
+
     void removePointCloud(const std::string &id = "cloud", const int viewport = 0) {
       callFuncSync([&](){pcl_visualizer_->removePointCloud(id, viewport);});
     }

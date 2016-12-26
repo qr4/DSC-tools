@@ -74,7 +74,6 @@ bool processCommandLine(int argc, char** argv, Configuration &config) {
   return true;
 }
 
-
 // FIXME: ugly globals
 std::atomic<bool> paused(false);
 std::atomic<bool> shutdown(false);
@@ -116,26 +115,19 @@ int main(int argc, char* argv[]) {
     device->startRecording(config.record_path);
   }
 
-//  cv::namedWindow("color", cv::WINDOW_AUTOSIZE);
-//  cv::namedWindow("depth-gray", cv::WINDOW_AUTOSIZE);
+  vis.addPointCloud<pcl::PointXYZ>(
+      pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()), "cam0");
 
   while (!shutdown) {
     if (paused) continue;
 
     auto images = device->getImages();
-//    auto depth_mm_image = std::get<1>(images.at(ImageType::DEPTH_MM));
-//    auto depth_gray_image = std::get<1>(images.at(ImageType::DEPTH_GRAYSCALE));
-//    auto rgb_image = std::get<1>(images.at(ImageType::RGB_ALIGNED));
+
+    auto rgb_image = std::get<1>(images.at(ImageType::RGB_ALIGNED));
     auto p3f_image = std::get<1>(images.at(ImageType::POINT_3F));
-    vis.removePointCloud("cam0");
 
-    auto point_cloud = getPointCloud(p3f_image);
-    vis.addPointCloud<pcl::PointXYZ>(point_cloud, "cam0");
-
-//    cv::imshow("color", rgb_image);
-//    cv::imshow("depth-gray", depth_gray_image);
-//    auto key = cv::waitKey(1);
-//    if (key == 27 /* Esc */) break;
+    auto point_cloud = getPointCloud(p3f_image, rgb_image);
+    vis.updatePointCloud<pcl::PointXYZRGB>(point_cloud, "cam0");
   }
 
   device->close();

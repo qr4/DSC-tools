@@ -87,13 +87,18 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr getPointCloud(const cv::Mat_<cv::Point3f>
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>());
   for (int y = 0; y < p3f_image.rows; ++y) {
     const cv::Point3f *depth_row = p3f_image.ptr<cv::Point3f>(y);
-    const cv::Vec3b *color_row = p3f_image.ptr<cv::Vec3b>(y);
+    const cv::Vec3b *color_row = color_image.ptr<cv::Vec3b>(y);
 
     for (int x = 0; x < p3f_image.cols; ++x) {
-      pcl::PointXYZRGB pt(depth_row[x].x, depth_row[x].y, depth_row[x].z);
+      pcl::PointXYZRGB pt;
+
+      pt.x = depth_row[x].x;
+      pt.y = depth_row[x].y;
+      pt.z = depth_row[x].z;
+
       pt.r = color_row[x][0];
-      pt.r = color_row[x][1];
-      pt.r = color_row[x][2];
+      pt.g = color_row[x][1];
+      pt.b = color_row[x][2];
 
       cloud->push_back(pt);
     }
@@ -101,7 +106,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr getPointCloud(const cv::Mat_<cv::Point3f>
   return cloud;
 }
 
-pcl::PointCloud<pcl::PointXZYRGB>::Ptr getPointCloud(const cv::Mat_<cv::Point3f> &p3f_image, cv::Scalar &color) {
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr getPointCloud(const cv::Mat_<cv::Point3f> &p3f_image, const cv::Scalar &color) {
   cv::Mat color_image(p3f_image.size(), CV_8UC3, color);
   return getPointCloud(p3f_image, color_image);
 }
