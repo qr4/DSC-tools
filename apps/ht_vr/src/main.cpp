@@ -16,6 +16,10 @@
 #include "utility_functions.hpp"
 #include "visualizer.hpp"
 
+// PCL
+#include <pcl/visualization/image_viewer.h>
+#include <X11/Xlib.h>
+
 struct Configuration {
   // parsed from command line
   std::string config_file;
@@ -103,17 +107,18 @@ int main(int argc, char* argv[]) {
   boost::property_tree::ptree ptree;
   boost::property_tree::read_json(configuration_file.string(), ptree);
 
-  Visualizer vis;
-  vis.registerKeyboardCallback(keyboardCallback);
+  auto device = new GenericOpenNIDevice();
+  device->init(ptree);
+
+  auto vis = std::make_shared<Visualizer>();
+  vis->registerKeyboardCallback(keyboardCallback);
 
   HeadDetectionPipeline head_detection;
   boost::filesystem::path haar_cascade_config(boost::filesystem::absolute(config.classifier_config_file));
   std::cout << "haar cascade " << haar_cascade_config.string() << std::endl;
   head_detection.init(haar_cascade_config.string());
 
-  auto device = new GenericOpenNIDevice();
-
-  device->init(ptree);
+//  pcl::visualization::ImageViewer viewer("Test");
 
   if (config.with_recording) {
     if (!device->openWithUri(config.input_path)) return 1;
@@ -125,25 +130,34 @@ int main(int argc, char* argv[]) {
     device->startRecording(config.record_path);
   }
 
-  vis.addPointCloud<pcl::PointXYZ>(
+  vis->addPointCloud<pcl::PointXYZ>(
       pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>()), "cam0");
+
+  XInitThreads();
 
   while (!shutdown) {
     if (paused) continue;
 
-    std::cout << "getting images" << std::endl;
     auto images = device->getImages();
-    std::cout << "setting images" << std::endl;
-    head_detection.setImages(images);
 
-    std::cout << "computing" << std::endl;
-//    head_detection.compute();
+    head_detection.setImages(images);
+    head_detection.compute();
 
     auto rgb_image = std::get<1>(images.at(ImageType::RGB_ALIGNED));
     auto p3f_image = std::get<1>(images.at(ImageType::POINT_3F));
+    auto depth_gray = std::get<1>(images.at(ImageType::DEPTH_GRAYSCALE));
+
+    auto head_pos = head_detection.getHeadPos();
 
     auto point_cloud = getPointCloud(p3f_image, rgb_image);
-    vis.updatePointCloud<pcl::PointXYZRGB>(point_cloud, "cam0");
+    vis->updatePointCloud<pcl::PointXYZRGB>(point_cloud, "cam0");
+
+//    viewer.addRGBImage(depth_gray.data, depth_gray.cols, depth_gray.rows);
+//    viewer.spinOnce();
+
+    std::cout << "Face Point: " << head_pos << std::endl;
+    vis->removeShape("head");
+    vis->addSphere(pcl::PointXYZ(head_pos.x, head_pos.y, head_pos.z), 0.1, 1, 0, 0, "head");
   }
 
   device->close();

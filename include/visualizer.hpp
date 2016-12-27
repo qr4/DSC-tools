@@ -7,6 +7,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <functional>
+#include <type_traits>
 #include <atomic>
 
 // PCL
@@ -53,6 +54,10 @@ class Visualizer {
       callFuncSync([&](){pcl_visualizer_->removePointCloud(id, viewport);});
     }
 
+    void removeShape(const std::string &id = "shape") {
+      callFuncSync([&](){pcl_visualizer_->removeShape(id);});
+    }
+
     void registerKeyboardCallback(
         boost::function<void (const pcl::visualization::KeyboardEvent&)> cb) {
       callFuncSync([&](){pcl_visualizer_->registerKeyboardCallback(cb);});
@@ -67,10 +72,10 @@ class Visualizer {
 
     // synchronization stuff:
     template<typename Fn>
-    void callFuncSync(const Fn &fn) {
+    typename std::result_of<Fn(void)>::type callFuncSync(const Fn &fn) {
       std::lock_guard<std::mutex> lk(mutex_);
       pcl_visualizer_->getRenderWindow()->MakeCurrent();
-      fn();
+      return fn();
     }
 
     std::thread thread_;

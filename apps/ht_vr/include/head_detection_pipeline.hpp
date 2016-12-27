@@ -12,6 +12,7 @@
 
 // Project Includes
 #include "enums.hpp"
+#include "visualizer.hpp"
 
 
 class HeadDetectionPipeline {
@@ -21,6 +22,7 @@ class HeadDetectionPipeline {
     ~HeadDetectionPipeline() = default;
 
     void init(const std::string &classifier_config);
+    void setVisualizer(const std::shared_ptr<Visualizer> &vis);
 
     void setImages(const std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> &images);
 
@@ -31,6 +33,7 @@ class HeadDetectionPipeline {
   private:
 
     cv::CascadeClassifier classifier_;
+    std::shared_ptr<Visualizer> visualizer_;
 
     // input
     std::unordered_map<ImageType, std::tuple<uint64_t, cv::Mat>> images_;
